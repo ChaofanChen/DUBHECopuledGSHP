@@ -174,11 +174,11 @@ nw.print_results()
 #nw.print_results()
 nw.save('heat_pump')
 
-#amb_in_su.set_attr(T=45)
-#cons.set_attr(Q=-0.9e6)
-#ic_in_he.set_attr(p=1, T=air_temp)
-#nw.solve('offdesign', design_path='heat_pump')
-#nw.print_results()
+amb_in_su.set_attr(T=40)
+cons.set_attr(Q=-0.9e6)
+ic_in_he.set_attr(p=1, T=air_temp)
+nw.solve('offdesign', design_path='heat_pump')
+nw.print_results()
 #
 #T_range = [25, 45, 41, 37, 34, 31, 25]
 #Q_range = np.array([0.9e6, 0.9e6])
