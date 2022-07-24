@@ -23,7 +23,7 @@ pamb = 1.013  # ambient pressure
 Tamb = 2.8  # ambient temperature
 
 # geothermal temperature and flow rate
-Tgeo = 15
+Tgeo = 25
 vgeo = 15
 
 # heating load from building site
@@ -65,7 +65,7 @@ nw.add_conns(cc_cd, cd_va, va_ev, ev_cp, cp_cc)
 # geothermal heat collector
 gh_in_ghp = Connection(gh_in, 'out1', ghp, 'in1')
 ghp_ev = Connection(ghp, 'out1', ev, 'in1')
-ev_gh_out = Connection(ev, 'out1', gh_out, 'in1')
+ev_gh_out = Connection(ev, 'out1', gh_out, 'in1', label='BHE_inlet')
 nw.add_conns(gh_in_ghp, ghp_ev, ev_gh_out)
 
 # heating system
@@ -78,8 +78,8 @@ nw.add_conns(hs_ret_hsp, hsp_cd, cd_hs_feed)
 # %% component parametrization
 
 # condenser
-cd.set_attr(pr1=0.99, pr2=0.99, ttd_u=8, design=['pr2', 'ttd_u'],
-            offdesign=['zeta2', 'kA_char'])
+cd.set_attr(pr1=0.99, pr2=0.99, ttd_u=8, design=['pr1', 'pr2', 'ttd_u'],
+            offdesign=['zeta1', 'zeta2', 'kA_char'])
 # evaporator
 kA_char1 = ldc('heat exchanger', 'kA_char1', 'DEFAULT', CharLine)
 kA_char2 = ldc('heat exchanger', 'kA_char2', 'EVAPORATING FLUID', CharLine)
@@ -106,7 +106,7 @@ ev_gh_out.set_attr(v=vgeo, p=1.5)
 
 # heating system
 cd_hs_feed.set_attr(T=40, p=2, fluid={'water': 1, 'R410A': 0})
-hs_ret_hsp.set_attr(T=35, p=2)
+hs_ret_hsp.set_attr(T=30, p=2)
 
 # starting values
 va_ev.set_attr(h0=275)
@@ -158,27 +158,37 @@ print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
 #abs(cd.Q.val) / (cp1.P.val + cp2.P.val + erp.P.val + pu.P.val)
 #print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
 
-T_range = np.linspace(50, 20, 10)
-Q_range = np.array([1.2e6])
-df = pd.DataFrame(columns=Q_range / -cd.Q.val)
-
+T_range = np.linspace(30, 18, 5)
+Q_range = np.array([1.225e6, 1.1e6, 1.0e6])
+df_cop = pd.DataFrame(columns=Q_range)
+df_reinj = pd.DataFrame(columns=Q_range)
 for T in T_range:
-    eps = []
+    cop = []
+    reinj = []
     gh_in_ghp.set_attr(T=T)
+
     for Q in Q_range:
         cd.set_attr(Q=-Q)
+#        cp.set_attr(igva='var')
         nw.solve('offdesign', design_path=path)
 
         if nw.lin_dep:
-            eps += [np.nan]
+            cop += [np.nan]
+            reinj += [np.nan]
         else:
-            eps += [abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val)]
+            cop += [abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val)]
+            reinj += [nw.get_conn('BHE_inlet').T.val]
 
-    df.loc[T] = eps
+    df_cop.loc[T] = cop
+    df_reinj.loc[T] = reinj
 
 fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
-ax.plot(df)
+ax.plot(df_cop)
 ax.set(xlabel= 'Geothermal BHE temperature (°C)', ylabel='COP (-)')
+
+fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
+ax.plot(df_reinj)
+ax.set(xlabel= 'Geothermal BHE temperature (°C)', ylabel='BHE return temperature (°C)')
 
 
 
