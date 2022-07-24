@@ -150,7 +150,7 @@ pu_ev.set_attr(m=Ref(va_dr, 0.75, 0), p0=5)
 su_cp1.set_attr(p0=5, state='g')
 
 # evaporator system hot side
-T_pro=50
+T_pro=55
 m_pro=15
 air_temp=10
 
@@ -174,8 +174,8 @@ nw.print_results()
 #nw.print_results()
 nw.save('heat_pump')
 
-amb_in_su.set_attr(T=40)
-cons.set_attr(Q=-0.9e6)
+amb_in_su.set_attr(T=35)
+cons.set_attr(Q=-1e6)
 ic_in_he.set_attr(p=1, T=air_temp)
 nw.solve('offdesign', design_path='heat_pump')
 nw.print_results()
