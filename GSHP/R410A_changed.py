@@ -105,8 +105,8 @@ gh_in_ghp.set_attr(T=Tgeo, p=1.5, fluid={'water': 1, 'R410A': 0})
 ev_gh_out.set_attr(v=vgeo, p=1.5)
 
 # heating system
-hs_ret_hsp.set_attr(m=24, p=2)
-cd_hs_feed.set_attr(T=60, p=2, fluid={'water': 1, 'R410A': 0})
+hs_ret_hsp.set_attr(T=45, m=24, p=2, fluid={'water': 1, 'R410A': 0})
+cd_hs_feed.set_attr(p=2)
 
 # starting values
 va_ev.set_attr(h0=275)
@@ -143,13 +143,13 @@ cd.set_attr(Q=Q_b)
 # %% design calculation
 
 path = 'R410A'
-nw.solve('design')
+nw.solve('design', init_path=path)
 # alternatively use:
 # nw.solve('design', init_path=path)
 print("\n##### DESIGN CALCULATION #####\n")
 nw.print_results()
 nw.save(path)
-print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
+#print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
 #print("\n##### OFF-DESIGN CALCULATION #####\n")
 #gh_in_ghp.set_attr(T=35)
 ##cp.set_attr(igva='var')
