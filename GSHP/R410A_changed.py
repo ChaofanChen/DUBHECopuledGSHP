@@ -23,11 +23,11 @@ pamb = 1.013  # ambient pressure
 Tamb = 2.8  # ambient temperature
 
 # geothermal temperature and flow rate
-Tgeo = 25
+Tgeo = 30
 vgeo = 15
 
 # heating load from building site
-Q_b = -1.225e6
+Q_b = -1.4e6
 
 nw = Network(fluids=['water', 'R410A'], T_unit='C', p_unit='bar',
              h_unit='kJ / kg', m_unit='kg / s', v_unit='l / s')
@@ -78,8 +78,8 @@ nw.add_conns(hs_ret_hsp, hsp_cd, cd_hs_feed)
 # %% component parametrization
 
 # condenser
-cd.set_attr(pr1=0.99, pr2=0.99, ttd_u=8, design=['pr1', 'pr2', 'ttd_u'],
-            offdesign=['zeta1', 'zeta2', 'kA_char'])
+cd.set_attr(pr1=0.99, pr2=0.99, ttd_u=8, design=['pr2', 'ttd_u'],
+            offdesign=['zeta2', 'kA_char'])
 # evaporator
 kA_char1 = ldc('heat exchanger', 'kA_char1', 'DEFAULT', CharLine)
 kA_char2 = ldc('heat exchanger', 'kA_char2', 'EVAPORATING FLUID', CharLine)
@@ -105,8 +105,8 @@ gh_in_ghp.set_attr(T=Tgeo, p=1.5, fluid={'water': 1, 'R410A': 0})
 ev_gh_out.set_attr(v=vgeo, p=1.5)
 
 # heating system
-cd_hs_feed.set_attr(T=40, p=2, fluid={'water': 1, 'R410A': 0})
-hs_ret_hsp.set_attr(T=30, p=2)
+hs_ret_hsp.set_attr(m=24, p=2)
+cd_hs_feed.set_attr(T=60, p=2, fluid={'water': 1, 'R410A': 0})
 
 # starting values
 va_ev.set_attr(h0=275)
@@ -158,8 +158,8 @@ print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
 #abs(cd.Q.val) / (cp1.P.val + cp2.P.val + erp.P.val + pu.P.val)
 #print(abs(cd.Q.val) / (cp.P.val + hsp.P.val + ghp.P.val))
 
-T_range = np.linspace(30, 18, 5)
-Q_range = np.array([1.225e6, 1.1e6, 1.0e6])
+T_range = np.linspace(50, 18, 5)
+Q_range = np.array([1.4e6, 1.225e6, 1.1e6, 1.0e6])
 df_cop = pd.DataFrame(columns=Q_range)
 df_reinj = pd.DataFrame(columns=Q_range)
 for T in T_range:
@@ -169,8 +169,10 @@ for T in T_range:
 
     for Q in Q_range:
         cd.set_attr(Q=-Q)
-#        cp.set_attr(igva='var')
-        nw.solve('offdesign', design_path=path)
+        if Q == Q_range[0]:
+            nw.solve('offdesign', init_path=path, design_path=path)
+        else:
+            nw.solve('offdesign', design_path=path)
 
         if nw.lin_dep:
             cop += [np.nan]
