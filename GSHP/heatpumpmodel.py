@@ -4,7 +4,16 @@ from tespy.components import (
     Compressor, Valve, HeatExchanger, CycleCloser, Source, Sink, Pump,
     HeatExchanger, HeatExchangerSimple
     )
-from tespy.connections import Bus, Connection
+from tespy.connections import Bus, Connection, Ref
+
+
+data = {
+    "working_fluid": "R410A",
+    "T_sink": 70,
+    "T_bhe": 35,
+    "p_bhe": 2,
+    "Q_design": 2
+}
 
 
 class HeatPumpModel:
@@ -54,7 +63,7 @@ class HeatPumpModel:
         compressor.set_attr(eta_s=0.85)
 
         c0.set_attr(fluid={self.working_fluid: 1, "water": 0})
-        c1.set_attr(p=CP.PropsSI(
+        c1.set_attr(x=0, p=CP.PropsSI(
             "P", "T", self.param["T_sink"] + 273.15,
             "Q", 0, self.working_fluid
             ) / 1e5
@@ -66,12 +75,12 @@ class HeatPumpModel:
         )
 
         c11.set_attr(
-            T=self.param["T_bhe"] - 2,
+            T=self.param["T_bhe"] + 2,
             p=self.param["p_bhe"],
             fluid={self.working_fluid: 0, "water": 1}
         )
         c13.set_attr(
-            T=self.param["T_bhe"] + 2,
+            T=self.param["T_bhe"] - 2,
             p=self.param["p_bhe"]
         )
 
@@ -90,28 +99,32 @@ class HeatPumpModel:
 
         condenser.set_attr(Q=self.param["Q_design"])
 
-        self.nw.solve("design")
-
-        c1.set_attr(p=None)
-        c3.set_attr(p=None)
-
-        evaporator.set_attr(ttd_l=2)
-
         self.nw.set_attr(iterinfo=False)
         self.nw.solve("design")
+
+        c3.set_attr(p=None)
+        evaporator.set_attr(ttd_l=5)
+
+        self.nw.solve("design")
+
+        evaporator.set_attr(design=["ttd_l"], offdesign=["kA"])
+
+        condenser.set_attr(offdesign=["kA"], Tamb=50)
+        c1.set_attr(design=["p"])
+
         self.stable_solution_path = f"stable_solution_{self.working_fluid}"
         self.nw.save(self.stable_solution_path)
-
-    def solve_model(self, **kwargs):
-        self.solve_design(**kwargs)
 
     def get_parameters(self, **kwargs):
 
         result = kwargs.copy()
         if "Connections" in kwargs:
             for c, params in kwargs["Connections"].items():
+                result["Connections"][c] = {}
                 for param in params:
-                    result["Connections"][c][param] = self.nw.get_conn(c).get_attr(param)
+                    result["Connections"][c][param] = self.nw.get_conn(c).get_attr(param).val
+
+        return result
 
     def get_param(self, obj, label, parameter):
         return self.get_single_parameter(obj, label, parameter)
@@ -150,4 +163,64 @@ class HeatPumpModel:
         except ValueError as e:
             print(e)
             self.nw.lin_dep = True
-            self.nw.solve("design", init_only=True, init_path=self.stable_solution_path)
+            self.nw.solve(
+                "design", init_only=True,
+                init_path=self.stable_solution_path
+            )
+
+    def solve_offdesign(self, **kwargs):
+        self.set_parameters(**kwargs)
+
+        self.solved = False
+        try:
+            self.nw.solve(
+                "offdesign",
+                design_path=self.design_path
+            )
+            if all(self.nw.results['HeatExchanger']['Q'] < 0):
+                self.solved = True
+        except ValueError as e:
+            print(e)
+            self.nw.solve(
+                "offdesign", init_only=True,
+                init_path=self.stable_solution_path,
+                design_path=self.design_path
+            )
+
+### outside of iteration
+
+data = {
+    "working_fluid": "R410A",
+    "T_bhe": 35,
+    "p_bhe": 1.5,
+    "T_sink": 70,
+    "Q_design": -1e6,
+}
+a = HeatPumpModel(data)
+
+a.solve_design(**data)
+a.design_path = f"design_path_{a.working_fluid}"
+a.nw.save(a.design_path)
+
+demand_data = pd.DataFrame(columns=["heat_demand"])
+demand_data.loc[0] = ...
+demand_data.loc[1] = ...
+
+####
+
+a.nw.get_conn("11").set_attr(T=T_prod)
+a.nw.get_conn("11").set_attr(v=flow_rate)
+a.nw.get_comp("Condenser").set_attr(Q=demand_data.loc[t, "heat_demand"])
+a.solve_offdesign(**data)
+
+
+
+if a.solved:
+    return_params = a.get_parameters(
+        **{"Connections": {"13": ["T", "v"]}}
+    )
+else:
+    print("ERROR")
+
+print(return_params)
+a.nw.print_results()
