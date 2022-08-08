@@ -6,6 +6,9 @@ from tespy.components import (
     )
 from tespy.connections import Bus, Connection, Ref
 
+import numpy as np
+import pandas as pd
+
 
 data = {
     "working_fluid": "R410A",
@@ -191,7 +194,7 @@ class HeatPumpModel:
 
 data = {
     "working_fluid": "R410A",
-    "T_bhe": 35,
+    "T_bhe": 25,
     "p_bhe": 1.5,
     "T_sink": 70,
     "Q_design": -1e6,
@@ -202,25 +205,53 @@ a.solve_design(**data)
 a.design_path = f"design_path_{a.working_fluid}"
 a.nw.save(a.design_path)
 
-demand_data = pd.DataFrame(columns=["heat_demand"])
-demand_data.loc[0] = ...
-demand_data.loc[1] = ...
+# demand_data = pd.DataFrame(columns=["heat_demand"])
+# demand_data.loc[0] = ...
+# demand_data.loc[1] = ...
 
-####
+# ####
 
-a.nw.get_conn("11").set_attr(T=T_prod)
-a.nw.get_conn("11").set_attr(v=flow_rate)
-a.nw.get_comp("Condenser").set_attr(Q=demand_data.loc[t, "heat_demand"])
-a.solve_offdesign(**data)
+# a.nw.get_conn("11").set_attr(T=T_prod)
+# a.nw.get_conn("11").set_attr(v=flow_rate)
+# a.nw.get_comp("Condenser").set_attr(Q=demand_data.loc[t, "heat_demand"])
+# a.solve_offdesign()
 
 
 
-if a.solved:
-    return_params = a.get_parameters(
-        **{"Connections": {"13": ["T", "v"]}}
-    )
-else:
-    print("ERROR")
+# if a.solved:
+#     return_params = a.get_parameters(
+#         **{"Connections": {"13": ["T", "v"]}}
+#     )
+# else:
+#     print("ERROR")
 
-print(return_params)
-a.nw.print_results()
+# print(return_params)
+# a.nw.print_results()
+
+a.nw.get_conn("11").set_attr(v=a.nw.get_conn("11").v.val)
+a.nw.get_conn("13").set_attr(T=None)
+T_prod_range = np.linspace(15, 30, 4)
+Q_range = np.linspace(-0.5e6, -1.0e6, 4)[::-1]
+
+tmp = None
+
+T_reinj_df = pd.DataFrame(columns=Q_range, index=T_prod_range)
+
+for T_prod in T_prod_range:
+
+    a.nw.get_conn("11").set_attr(T=T_prod)
+
+    for Q in Q_range:
+
+        a.nw.get_comp("Condenser").set_attr(Q=Q)
+
+        if Q == Q_range[0]:
+            a.nw.solve("offdesign", design_path=a.design_path, init_path=tmp)
+            a.nw.save("tmp")
+            tmp = "tmp"
+        else:
+            a.nw.solve("offdesign", design_path=a.design_path)
+
+        T_reinj_df.loc[T_prod, Q] = a.nw.get_conn("13").T.val
+
+T_reinj_df.to_csv("Lookuptable_TESPy_T_reinj.csv")
