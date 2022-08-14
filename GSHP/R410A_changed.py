@@ -17,13 +17,16 @@ from tespy.tools.characteristics import load_default_char as ldc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import tespy
 
+# print('CoolProp ver:%s'%(CoolProp.__version__))
+print('TESPy ver:%s'%(tespy.__version__))
 # %% network
 pamb = 1.013  # ambient pressure
 Tamb = 2.8  # ambient temperature
 
 # geothermal temperature and flow rate
-Tgeo = 30
+Tgeo = 40
 vgeo = 15
 
 # heating load from building site
@@ -105,7 +108,7 @@ gh_in_ghp.set_attr(T=Tgeo, p=1.5, fluid={'water': 1, 'R410A': 0})
 ev_gh_out.set_attr(v=vgeo, p=1.5)
 
 # heating system
-hs_ret_hsp.set_attr(T=45, m=24, p=2, fluid={'water': 1, 'R410A': 0})
+hs_ret_hsp.set_attr(T=35, m=24, p=2, fluid={'water': 1, 'R410A': 0})
 cd_hs_feed.set_attr(p=2)
 
 # starting values
