@@ -65,7 +65,7 @@ class HeatPumpIHXModel:
             "Q", 0, self.working_fluid
             ) / 1e5
         )
-        c3.set_attr(x=1, p=CP.PropsSI(
+        c4.set_attr(x=1, p=CP.PropsSI(
             "P", "T", self.param["T_bhe"] + 273.15,
             "Q", 1, self.working_fluid
             ) / 1e5
@@ -99,21 +99,20 @@ class HeatPumpIHXModel:
         self.nw.set_attr(iterinfo=False)
         self.nw.solve("design")
 
-        c3.set_attr(p=None)
+        c4.set_attr(p=None)
         evaporator.set_attr(ttd_l=5)
 
+        self.nw.set_attr(iterinfo=False)
         self.nw.solve("design")
 
         evaporator.set_attr(design=["ttd_l"], offdesign=["kA"])
 
-        condenser.set_attr(offdesign=["kA"], Tamb=50)
+        condenser.set_attr(offdesign=["kA"], Tamb=60)
         c1.set_attr(design=["p"])
 
         self.stable_solution_path = f"stable_solution_{self.working_fluid}"
         self.nw.save(self.stable_solution_path)
-
-    def init_simulation(self, **kwargs):
-        c6.set_attr()
+        # self.nw.print_results()
 
     def get_parameters(self, **kwargs):
 
@@ -193,31 +192,36 @@ data = {
    "working_fluid": "R410A",
    "T_bhe": 35,
    "p_bhe": 1.5,
-   "T_sink": 60,
+   "T_sink": 65,
    "Q_design": -1e6,
 }
 a = HeatPumpIHXModel(data)
-
-a.solve_design(**data)
 a.design_path = f"design_path_{a.working_fluid}"
-a.nw.save(a.design_path)
+a.solve_design(**data)
+
+if a.solved:
+    a.nw.print_results()
+    a.nw.save(a.design_path)
+else:
+    print("Error in design phase")
+
 ##
 ##demand_data = pd.DataFrame(columns=["heat_demand"])
 ##demand_data.loc[0] = ...
 ##demand_data.loc[1] = ...
 #
 #####
-#a.nw.get_conn("13").set_attr(T=None)
-#a.nw.get_conn("11").set_attr(T=35, v=0.059)
-##a.nw.get_conn("11").set_attr(v=0.01)
-#a.nw.get_comp("Condenser").set_attr(Q=-1e6)
-#a.solve_offdesign(**data)
-#
-#if a.solved:
-#    return_params = a.get_param("Connections", "13", "T")
-#    
-#    print(return_params)
-#else:
-#    print("ERROR")
-#
-#a.nw.print_results()
+a.nw.get_conn("13").set_attr(T=None)
+a.nw.get_conn("11").set_attr(T=35, v=0.059)
+#a.nw.get_conn("11").set_attr(v=0.01)
+a.nw.get_comp("Condenser").set_attr(Q=-1e6)
+a.solve_offdesign(**data)
+
+if a.solved:
+   return_params = a.get_param("Connections", "13", "T")
+
+   a.nw.print_results()
+   print(return_params)
+else:
+   print("Error in off-design phase")
+
