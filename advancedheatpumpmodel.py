@@ -107,7 +107,7 @@ class HeatPumpIHXModel:
 
         evaporator.set_attr(design=["ttd_l"], offdesign=["kA"])
 
-        condenser.set_attr(offdesign=["kA"], Tamb=50)
+        condenser.set_attr(offdesign=["kA"], Tamb=5)
         c1.set_attr(design=["p"])
 
         self.stable_solution_path = f"stable_solution_{self.working_fluid}"
@@ -202,6 +202,7 @@ a.solve_design(**data)
 if a.solved:
     a.nw.print_results()
     a.nw.save(a.design_path)
+    print("+"*90)
 else:
     print("Error in design phase")
 

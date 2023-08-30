@@ -99,7 +99,7 @@ class HeatPumpModel:
 
         evaporator.set_attr(design=["ttd_l"], offdesign=["kA"])
 
-        condenser.set_attr(offdesign=["kA"], Tamb=50)
+        condenser.set_attr(offdesign=["kA"], Tamb=5)
         c1.set_attr(design=["p"])
 
         self.stable_solution_path = f"stable_solution_{self.working_fluid}"
