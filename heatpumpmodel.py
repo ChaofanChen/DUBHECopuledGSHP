@@ -177,37 +177,35 @@ class HeatPumpModel:
                 design_path=self.design_path
             )
 
-### outside of iteration
+## outside of iteration
+
+data = {
+   "working_fluid": "R410A",
+   "T_bhe": 35,
+   "p_bhe": 1.5,
+   "T_sink": 65,
+   "Q_design": -1e6,
+}
+a = HeatPumpModel(data)
+
+a.solve_design(**data)
+a.design_path = f"design_path_{a.working_fluid}"
+a.nw.save(a.design_path)
 #
-#data = {
-#    "working_fluid": "R410A",
-#    "T_bhe": 35,
-#    "p_bhe": 1.5,
-#    "T_sink": 70,
-#    "Q_design": -1e6,
-#}
-#a = HeatPumpModel(data)
-#
-#a.solve_design(**data)
-#a.design_path = f"design_path_{a.working_fluid}"
-#a.nw.save(a.design_path)
-##
-##demand_data = pd.DataFrame(columns=["heat_demand"])
-##demand_data.loc[0] = ...
-##demand_data.loc[1] = ...
-#
-#####
-#a.nw.get_conn("13").set_attr(T=None)
-#a.nw.get_conn("11").set_attr(T=35, v=0.059)
-##a.nw.get_conn("11").set_attr(v=0.01)
-#a.nw.get_comp("Condenser").set_attr(Q=-1e6)
-#a.solve_offdesign(**data)
-#
-#if a.solved:
-#    return_params = a.get_param("Connections", "13", "T")
-#    
-#    print(return_params)
-#else:
-#    print("ERROR")
-#
-#a.nw.print_results()
+#demand_data = pd.DataFrame(columns=["heat_demand"])
+#demand_data.loc[0] = ...
+#demand_data.loc[1] = ...
+
+####
+a.nw.get_conn("13").set_attr(T=None)
+a.nw.get_conn("11").set_attr(T=35, v=0.059)
+#a.nw.get_conn("11").set_attr(v=0.01)
+a.nw.get_comp("Condenser").set_attr(Q=-1e6)
+a.solve_offdesign(**data)
+
+if a.solved:
+   a.nw.print_results()
+   return_params = a.get_param("Connections", "13", "T")
+   print(return_params)
+else:
+   print("ERROR")
