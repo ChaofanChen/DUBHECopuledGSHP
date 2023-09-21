@@ -36,34 +36,40 @@ def castToList(x): #casts x to a list
         return list(x)
     except TypeError:
         return [x]
-    
+
 # OGS setting
 # Dirichlet BCs
 class BC(OpenGeoSys.BHENetwork):
     def initializeDataContainer(self):
         print('info: Initialize TESPy')
         t = 0  # 'initial time'
-        Tin_val = [15]  # 'Tin_val'
-        Tout_val = [20]  # 'Tout_val'
+        Tout_val = [35]  # 'Tout_val'
         Tout_node_id = [1] # 'Tout_node_id'
-        bhe_flow_rate = [0.1]  # 'BHE flow rate'
-        
+
         self.data = {
             "working_fluid": "R410A",
             "T_bhe": Tout_val[0],
             "p_bhe": 1.5,
-            "T_sink": 70,
+            "T_sink": 65,
             "Q_design": -1e6,
         }
         self.heatpump = HeatPumpModel(self.data)        
-        self.heatpump.solve_design(**self.data)        
-        self.heatpump.design_path = f"design_path_{self.heatpump.working_fluid}"
-        self.heatpump.nw.save(self.heatpump.design_path)
+        self.heatpump.solve_design(**self.data)
+
+        if self.heatpump.solved:
+            self.heatpump.nw.print_results()
+            self.heatpump.design_path = f"design_path_{self.heatpump.working_fluid}"
+            self.heatpump.nw.save(self.heatpump.design_path)
+            T_bhe_reinj = self.heatpump.get_param("Connections", "13", "T")
+            v_bhe = self.heatpump.get_param("Connections", "13", "v")
+        else:
+            print("ERROR")
+
         print('BHE trial re-injection temperature = ',
               self.heatpump.get_param("Connections", "13", "T"))
-        self.heatpump.nw.print_results()
-#        print(self.heatpump)
-        return (t, Tin_val, Tout_val, Tout_node_id, bhe_flow_rate)
+        print('BHE trial flow rate = ',
+              self.heatpump.get_param("Connections", "13", "v"))
+        return (t, castToList(T_bhe_reinj), Tout_val, Tout_node_id, castToList(v_bhe))
 
     def tespySolver(self, t, Tin_val, Tout_val):
         # network status:
@@ -76,12 +82,12 @@ class BC(OpenGeoSys.BHENetwork):
             # TESPy solver
             print('BHE production temperature = ', Tout_val[0])
             
-            self.heatpump.nw.get_conn("11").set_attr(T=Tout_val[0], v=0.059)
-            self.heatpump.nw.get_conn("13").set_attr(T=None)
-            self.heatpump.nw.get_comp("Condenser").set_attr(Q=-1.3e6)
+            self.heatpump.nw.get_conn("11").set_attr(T=Tout_val[0]) 
+            self.heatpump.nw.get_conn("13").set_attr(T=None, v=0.01295) # v is the flow rate 
+            self.heatpump.nw.get_comp("Condenser").set_attr(Q=-5.8e5)
             print('info: Calculate off-design performance')
-            self.heatpump.solve_offdesign()
-            
+            self.heatpump.solve_offdesign(**self.data)
+
             if self.heatpump.solved:
                 if_success = True
                 self.heatpump.nw.print_results()

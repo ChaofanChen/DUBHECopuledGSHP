@@ -198,9 +198,9 @@ a.nw.save(a.design_path)
 
 ####
 a.nw.get_conn("13").set_attr(T=None)
-a.nw.get_conn("11").set_attr(T=35, v=0.059)
+a.nw.get_conn("11").set_attr(T=40, v=0.01295)
 #a.nw.get_conn("11").set_attr(v=0.01)
-a.nw.get_comp("Condenser").set_attr(Q=-1e6)
+a.nw.get_comp("Condenser").set_attr(Q=-5.8e5)
 a.solve_offdesign(**data)
 
 if a.solved:
