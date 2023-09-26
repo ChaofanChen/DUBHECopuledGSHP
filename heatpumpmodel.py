@@ -3,10 +3,11 @@ from tespy.networks import Network
 from tespy.components import (
     Compressor, Valve, HeatExchanger, CycleCloser, Source, Sink, Pump,
     HeatExchanger, HeatExchangerSimple
-    )
+)
 from tespy.connections import Bus, Connection, Ref
 
-class HeatPumpModel:
+
+class HeatPumpModel():
 
     def __init__(self, param) -> None:
 
@@ -15,7 +16,7 @@ class HeatPumpModel:
 
         self.nw = Network(
             fluids=[self.working_fluid, "water"], p_unit="bar", T_unit="C"
-            )
+        )
 
         # Refrigerant Cylce
         compressor = Compressor("Compressor")
@@ -56,13 +57,13 @@ class HeatPumpModel:
         c1.set_attr(x=0, p=CP.PropsSI(
             "P", "T", self.param["T_sink"] + 273.15,
             "Q", 0, self.working_fluid
-            ) / 1e5
-        )
+        ) / 1e5
+                    )
         c3.set_attr(x=1, p=CP.PropsSI(
             "P", "T", self.param["T_bhe"] + 273.15,
             "Q", 1, self.working_fluid
-            ) / 1e5
-        )
+        ) / 1e5
+                    )
 
         c11.set_attr(
             T=self.param["T_bhe"] + 2,
@@ -137,7 +138,7 @@ class HeatPumpModel:
 
     def set_single_parameter(self, obj, label, parameter, value):
         if obj == "Components":
-            self.nw.get_comp(label).set_attr({parameter: value})
+            self.nw.get_comp(label).set_attr(**{parameter: value})
         elif obj == "Connections":
             self.nw.get_conn(label).set_attr(**{parameter: value})
 
@@ -177,14 +178,18 @@ class HeatPumpModel:
                 design_path=self.design_path
             )
 
+    def get_COP_value(self):
+        return self.nw.busses['heat output'].P.val / self.nw.busses['power input'].P.val
+
+
 ## outside of iteration
 
 data = {
-   "working_fluid": "R410A",
-   "T_bhe": 35,
-   "p_bhe": 1.5,
-   "T_sink": 65,
-   "Q_design": -1e6,
+    "working_fluid": "R410A",
+    "T_bhe": 35,
+    "p_bhe": 1.5,
+    "T_sink": 65,
+    "Q_design": -1e6,
 }
 a = HeatPumpModel(data)
 
@@ -192,20 +197,22 @@ a.solve_design(**data)
 a.design_path = f"design_path_{a.working_fluid}"
 a.nw.save(a.design_path)
 #
-#demand_data = pd.DataFrame(columns=["heat_demand"])
-#demand_data.loc[0] = ...
-#demand_data.loc[1] = ...
+# demand_data = pd.DataFrame(columns=["heat_demand"])
+# demand_data.loc[0] = ...
+# demand_data.loc[1] = ...
 
 ####
 a.nw.get_conn("13").set_attr(T=None)
-a.nw.get_conn("11").set_attr(T=40, v=0.01295)
-#a.nw.get_conn("11").set_attr(v=0.01)
-a.nw.get_comp("Condenser").set_attr(Q=-5.8e5)
+a.nw.get_conn("11").set_attr(T=21.06, v=0.01295)
+# a.nw.get_conn("11").set_attr(v=0.01)
+a.nw.get_comp("Condenser").set_attr(Q=-4.8e5)
 a.solve_offdesign(**data)
 
 if a.solved:
-   a.nw.print_results()
-   return_params = a.get_param("Connections", "13", "T")
-   print(return_params)
+    a.nw.print_results()
+    return_params = a.get_param("Connections", "13", "T")
+    print(return_params)
+    cop = a.get_COP_value()
+    print('COP', cop)
 else:
-   print("ERROR")
+    print("ERROR")
