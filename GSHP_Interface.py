@@ -9,6 +9,7 @@ import sys
 print(sys.version)
 import os
 import numpy as np
+import pandas as pd
 import OpenGeoSys
 from heatpumpmodel import HeatPumpModel
 
@@ -72,6 +73,7 @@ class BC(OpenGeoSys.BHENetwork):
         return (t, castToList(T_bhe_reinj), Tout_val, Tout_node_id, castToList(v_bhe))
 
     def tespySolver(self, t, Tin_val, Tout_val):
+        COP_List = []
         # network status:
         nw_status = network_status(t)
         # if network closed:
@@ -93,9 +95,13 @@ class BC(OpenGeoSys.BHENetwork):
                 self.heatpump.nw.print_results()
                 T_bhe_reinj = self.heatpump.get_param("Connections", "13", "T")
                 v_bhe = self.heatpump.get_param("Connections", "13", "v")
+                cop = self.heatpump.get_COP_value()
+                COP_List += [cop]
+                df = pd.DataFrame(COP_List, columns=["cop"])
+                df.to_csv('cop_'+str(t)+'.csv', index=False)
             else:
                 print("ERROR")
-
+            print('Heat pump COP = ', cop)
             # return to OGS
             print('BHE re-injection temperature = ', castToList(T_bhe_reinj))
             print('BHE flow rate = ', castToList(v_bhe))
