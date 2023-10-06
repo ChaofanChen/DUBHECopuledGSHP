@@ -50,14 +50,14 @@ class HeatPumpIHXModel:
         self.nw.add_conns(c11, c12, c13)
 
         evaporator.set_attr(pr1=0.98, pr2=1)
-        condenser.set_attr(pr=0.98)
+        condenser.set_attr(pr=1)
 
         ihx.set_attr(ttd_u=5)
         ihx.set_attr(pr1=0.98, pr2=0.98)
 
-        bhe_pump.set_attr(eta_s=0.75)
+        bhe_pump.set_attr(eta_s=0.75, design=["eta_s"], offdesign=["eta_s_char"])
 
-        compressor.set_attr(eta_s=0.85)
+        compressor.set_attr(eta_s=0.85, design=["eta_s"], offdesign=["eta_s_char"])
 
         c0.set_attr(fluid={self.working_fluid: 1, "water": 0})
         c1.set_attr(x=0, p=CP.PropsSI(
@@ -105,10 +105,10 @@ class HeatPumpIHXModel:
         self.nw.set_attr(iterinfo=False)
         self.nw.solve("design")
 
-        evaporator.set_attr(design=["ttd_l"], offdesign=["kA"])
+        evaporator.set_attr(design=["ttd_l"], offdesign=["kA_char"])
 
-        condenser.set_attr(offdesign=["kA"], Tamb=5)
-        c1.set_attr(design=["p"])
+        condenser.set_attr()
+        c1.set_attr()
 
         self.stable_solution_path = f"stable_solution_{self.working_fluid}"
         self.nw.save(self.stable_solution_path)
@@ -186,42 +186,85 @@ class HeatPumpIHXModel:
                 design_path=self.design_path
             )
 
-### outside of iteration
-#
-data = {
-   "working_fluid": "R410A",
-   "T_bhe": 35,
-   "p_bhe": 1.5,
-   "T_sink": 65,
-   "Q_design": -1e6,
-}
-a = HeatPumpIHXModel(data)
-a.design_path = f"design_path_{a.working_fluid}"
-a.solve_design(**data)
 
-if a.solved:
-    a.nw.print_results()
+    def get_COP_value(self):
+        return self.nw.busses['heat output'].P.val / self.nw.busses['power input'].P.val
+
+
+import matplotlib.pyplot as plt
+
+
+fig, ax = plt.subplots(1, 2)
+
+## outside of iteration#
+for wf in ["R1234ze(E)", "R134a", "R410A", "R600", "R290"]:
+
+    data = {
+        "working_fluid": wf,
+        "T_bhe": 35,
+        "p_bhe": 1.5,
+        "T_sink": 65,
+        "Q_design": -1e6,
+    }
+    a = HeatPumpIHXModel(data)
+
+    a.solve_design(**data)
+    a.design_path = f"design_path_{a.working_fluid}"
     a.nw.save(a.design_path)
-    print("+"*90)
-else:
-    print("Error in design phase")
+    a.nw.print_results()
+    #
+    # demand_data = pd.DataFrame(columns=["heat_demand"])
+    # demand_data.loc[0] = ...
+    # demand_data.loc[1] = ...
 
-##
-##demand_data = pd.DataFrame(columns=["heat_demand"])
-##demand_data.loc[0] = ...
-##demand_data.loc[1] = ...
-#
-#####
-a.nw.get_conn("13").set_attr(T=None)
-a.nw.get_conn("11").set_attr(T=35, v=0.059)
-#a.nw.get_conn("11").set_attr(v=0.01)
-a.nw.get_comp("Condenser").set_attr(Q=-1e6)
-a.solve_offdesign(**data)
+    ####
+    a.nw.get_conn("13").set_attr(T=None)
+    a.nw.get_conn("11").set_attr(T=21.06, v=0.01295)
+    # a.nw.get_conn("11").set_attr(v=0.01)
+    a.nw.get_comp("Condenser").set_attr(Q=-10e5)
+    a.solve_offdesign()
 
-if a.solved:
-   return_params = a.get_param("Connections", "13", "T")
+    T_bhe_previous = a.get_param("Connections", "11", "T")
+    Q_previous = a.get_param("Components", "Condenser", "Q")
 
-   a.nw.print_results()
-   print(return_params)
-else:
-   print("Error in off-design phase")
+    import numpy as np
+
+    T_list = [45, 15, 30, 25, 35, 40, 15, 35, 25]
+    Q_list = np.array([2.5, 4, 7.5, 8, 4, 10, 9.2, 10.5, 3]) * -1e5
+
+    COP_List = []
+    carnot_COP = []
+
+    for T, Q in zip(T_list, Q_list):
+
+        num = int(abs(T - T_bhe_previous) // 5) + 1
+        T_range = np.linspace(T, T_bhe_previous, num, endpoint=False)[::-1]
+        num = int(abs(Q - Q_previous) // 1.5e5) + 1
+        Q_range = np.linspace(Q, Q_previous, num, endpoint=False)[::-1]
+
+        for T_step in T_range:
+            a.nw.get_conn("11").set_attr(T=T_step)
+            a.solve_offdesign()
+        for Q_step in Q_range:
+            a.nw.get_comp("Condenser").set_attr(Q=Q_step)
+            a.solve_offdesign()
+
+        if a.solved:
+            return_params = a.get_param("Connections", "13", "T")
+            print("T_return:", return_params)
+            cop = a.get_COP_value()
+            print('COP', cop)
+            COP_List += [cop]
+            carnot_COP += [(data["T_sink"] + 273.15) / (data["T_sink"] - a.get_param("Connections", "2", "T"))]
+        else:
+            print("ERROR")
+
+    ax[0].scatter(T_list, COP_List)
+    # ax[0].scatter(T_list, carnot_COP)
+    ax[1].scatter(Q_list, COP_List)
+
+ax[0].set_ylabel("COP")
+ax[0].set_xlabel("BHE outlet temperature")
+ax[1].set_xlabel("Heat demand")
+
+plt.show()
