@@ -2,7 +2,7 @@ import CoolProp.CoolProp as CP
 from tespy.networks import Network
 from tespy.components import (
     Compressor, Valve, HeatExchanger, CycleCloser, Source, Sink, Pump,
-    HeatExchanger, HeatExchangerSimple
+    HeatExchanger, SimpleHeatExchanger
 )
 from tespy.connections import Bus, Connection, Ref
 
@@ -14,15 +14,13 @@ class HeatPumpModel():
         self.param = param
         self.working_fluid = self.param["working_fluid"]
 
-        self.nw = Network(
-            fluids=[self.working_fluid, "water"], p_unit="bar", T_unit="C"
-        )
+        self.nw = Network(p_unit="bar", T_unit="C")
 
         # Refrigerant Cylce
         compressor = Compressor("Compressor")
         valve = Valve("Valve")
         evaporator = HeatExchanger("Evaporator")
-        condenser = HeatExchangerSimple("Condenser")
+        condenser = SimpleHeatExchanger("Condenser")
         cycle_closer = CycleCloser("Cycle Closer")
 
         # Heat Source
@@ -53,12 +51,8 @@ class HeatPumpModel():
 
         compressor.set_attr(eta_s=0.85, design=["eta_s"], offdesign=["eta_s_char"])
 
-        c0.set_attr(fluid={self.working_fluid: 1, "water": 0})
-        c1.set_attr(x=0, p=CP.PropsSI(
-            "P", "T", self.param["T_sink"] + 273.15,
-            "Q", 0, self.working_fluid
-        ) / 1e5
-                    )
+        c0.set_attr(fluid={self.working_fluid: 1})
+        c1.set_attr(x=0, T=self.param["T_sink"])
         c3.set_attr(x=1, p=CP.PropsSI(
             "P", "T", self.param["T_bhe"] + 273.15,
             "Q", 1, self.working_fluid
@@ -68,10 +62,10 @@ class HeatPumpModel():
         c11.set_attr(
             T=self.param["T_bhe"] + 2,
             p=self.param["p_bhe"],
-            fluid={self.working_fluid: 0, "water": 1}
+            fluid={"water": 1}
         )
         c13.set_attr(
-            T=self.param["T_bhe"] - 2,
+            T=self.param["T_bhe"] - 5,
             p=self.param["p_bhe"]
         )
 
@@ -97,6 +91,7 @@ class HeatPumpModel():
         evaporator.set_attr(ttd_l=5)
 
         self.nw.solve("design")
+        self.nw.print_results()
 
         evaporator.set_attr(design=["ttd_l"], offdesign=["kA_char"])
 
@@ -185,77 +180,135 @@ class HeatPumpModel():
 import matplotlib.pyplot as plt
 
 
-fig, ax = plt.subplots(1, 2)
+fig, ax = plt.subplots(2, 2, sharex="col")
+ax1, ax2, ax3, ax4 = ax.flatten()
+
+# heat_nominal_values = [-5.8e5, -6.8e5, -7.8e5, -8.8e5]
+heat_nominal = -7e5
+wfs = ["R290"]#, "R410A", "R600"]
 
 ## outside of iteration#
-for wf in ["R1234ze(E)", "R134a", "R410A", "R600", "R290"]:
+import pandas as pd
+operation_data = pd.read_csv("operation_heat_pump_summer.csv", index_col=0)
+
+for wf in wfs:
 
     data = {
         "working_fluid": wf,
         "T_bhe": 35,
         "p_bhe": 1.5,
         "T_sink": 65,
-        "Q_design": -1e6,
+        "Q_design": heat_nominal,
     }
     a = HeatPumpModel(data)
 
     a.solve_design(**data)
     a.design_path = f"design_path_{a.working_fluid}"
     a.nw.save(a.design_path)
-    a.nw.print_results()
+    # a.nw.print_results()
+    # continue
     #
     # demand_data = pd.DataFrame(columns=["heat_demand"])
     # demand_data.loc[0] = ...
     # demand_data.loc[1] = ...
 
     ####
+    a.nw.get_conn("11").set_attr(T=35, v=0.023)
     a.nw.get_conn("13").set_attr(T=None)
-    a.nw.get_conn("11").set_attr(T=21.06, v=0.01295)
+    # a.nw.get_conn("13").set_attr(T=Ref(a.nw.get_conn("11"), 1, -5))
     # a.nw.get_conn("11").set_attr(v=0.01)
-    a.nw.get_comp("Condenser").set_attr(Q=-10e5)
+    a.nw.get_comp("Condenser").set_attr(Q=heat_nominal)
+    cmp = a.nw.get_comp("Compressor")
+    ev = a.nw.get_comp("Evaporator")
     a.solve_offdesign()
 
-    T_bhe_previous = a.get_param("Connections", "11", "T")
-    Q_previous = a.get_param("Components", "Condenser", "Q")
-
+    cop_values = []
+    T_bhe_feed = []
+    delta_T = []
+    heat_BHE = []
+    vol_flow = []
+    Q_range = []
+    T_feed_range = []
     import numpy as np
 
-    T_list = [45, 15, 30, 25, 35, 40, 15, 35, 25]
-    Q_list = np.array([2.5, 4, 7.5, 8, 4, 10, 9.2, 10.5, 3]) * -1e5
+    # T_return_range = np.linspace(35, 10, 15)
 
-    COP_List = []
-    carnot_COP = []
+    for idx, row in operation_data.iterrows():
+        Q = -row["heat_pump"]
+        T_feed = row["T_feed"]
 
-    for T, Q in zip(T_list, Q_list):
+        if Q == 0:
+            continue
 
-        num = int(abs(T - T_bhe_previous) // 5) + 1
-        T_range = np.linspace(T, T_bhe_previous, num, endpoint=False)[::-1]
-        num = int(abs(Q - Q_previous) // 2.5e5) + 1
-        Q_range = np.linspace(Q, Q_previous, num, endpoint=False)[::-1]
+        # a.nw.get_conn("11").set_attr(T=T_return)
+        a.nw.get_conn("1").set_attr(T=T_feed + 3)
+        a.nw.get_comp("Condenser").set_attr(Q=Q * 1e3)
 
-        for T_step in T_range:
-            a.nw.get_conn("11").set_attr(T=T_step)
-            a.solve_offdesign()
-        for Q_step in Q_range:
-            a.nw.get_comp("Condenser").set_attr(Q=Q_step)
-            a.solve_offdesign()
+        a.solve_offdesign()
 
-        if a.solved:
-            return_params = a.get_param("Connections", "13", "T")
-            print("T_return:", return_params)
-            cop = a.get_COP_value()
-            print('COP', cop)
-            COP_List += [cop]
-            carnot_COP += [(data["T_sink"] + 273.15) / (data["T_sink"] - a.get_param("Connections", "2", "T"))]
-        else:
-            print("ERROR")
+        print(cmp.eta_s.val, cmp.pr.val, T_feed, Q, a.get_COP_value())
+        # a.nw.print_results()
+        Q_range += [Q]
+        T_feed_range += [T_feed]
+        T_bhe_feed += [a.nw.get_conn("13").T.val]
+        vol_flow += [a.nw.get_conn("11").v.val_SI]
 
-    ax[0].scatter(T_list, COP_List)
-    # ax[0].scatter(T_list, carnot_COP)
-    ax[1].scatter(Q_list, COP_List)
+        cop_values += [a.get_COP_value()]
+        # delta_T += [T_return - T_feed[-1]]
+        heat_BHE += [ev.Q.val]
 
-ax[0].set_ylabel("COP")
-ax[0].set_xlabel("BHE outlet temperature")
-ax[1].set_xlabel("Heat demand")
+    ax1.scatter(Q_range, cop_values)
+    ax3.scatter(Q_range, T_feed_range)
+    ax2.scatter(T_feed_range, cop_values)
+    plt.show()
 
-plt.show()
+    # ax1.plot(T_return_range, cop_values)
+    # ax2.plot(T_return_range, T_feed)
+    # ax3.plot(T_return_range, delta_T)
+    # ax4.plot(T_return_range, vol_flow)
+    # ax4.plot(T_return_range, heat_BHE)
+# plt.show()
+#     T_bhe_previous = a.get_param("Connections", "11", "T")
+#     Q_previous = a.get_param("Components", "Condenser", "Q")
+
+#     import numpy as np
+
+#     T_list = np.geomspace(33, 40, 10)[::-1]
+#     Q_list = np.array([6.8] * 10) * -1e5
+
+#     COP_List = []
+#     carnot_COP = []
+
+#     for T, Q in zip(T_list, Q_list):
+
+#         num = int(abs(T - T_bhe_previous) // 5) + 1
+#         T_range = np.linspace(T, T_bhe_previous, num, endpoint=False)[::-1]
+#         num = int(abs(Q - Q_previous) // 2.5e5) + 1
+#         Q_range = np.linspace(Q, Q_previous, num, endpoint=False)[::-1]
+
+#         for T_step in T_range:
+#             a.nw.get_conn("11").set_attr(T=T_step)
+#             a.solve_offdesign()
+#         for Q_step in Q_range:
+#             a.nw.get_comp("Condenser").set_attr(Q=Q_step)
+#             a.solve_offdesign()
+
+#         if a.solved:
+#             return_params = a.get_param("Connections", "13", "T")
+#             print("T_return:", return_params)
+#             cop = a.get_COP_value()
+#             print('COP', cop)
+#             COP_List += [cop]
+#             carnot_COP += [(data["T_sink"] + 273.15) / (data["T_sink"] - a.get_param("Connections", "2", "T"))]
+#         else:
+#             print("ERROR")
+
+#     ax[0].scatter(T_list, COP_List)
+#     # ax[0].scatter(T_list, carnot_COP)
+#     ax[1].scatter(Q_list, COP_List)
+
+# ax[0].set_ylabel("COP")
+# ax[0].set_xlabel("BHE outlet temperature")
+# ax[1].set_xlabel("Heat demand")
+
+# plt.show()

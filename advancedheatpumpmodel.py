@@ -13,9 +13,8 @@ class HeatPumpIHXModel:
         self.param = param
         self.working_fluid = self.param["working_fluid"]
 
-        self.nw = Network(
-            fluids=[self.working_fluid, "water"], p_unit="bar", T_unit="C"
-            )
+        self.nw = Network(p_unit="bar", T_unit="C"
+)
 
         # Refrigerant Cylce
         compressor = Compressor("Compressor")
@@ -52,29 +51,22 @@ class HeatPumpIHXModel:
         evaporator.set_attr(pr1=0.98, pr2=1)
         condenser.set_attr(pr=1)
 
-        ihx.set_attr(ttd_u=5)
+        # ihx.set_attr(ttd_u=5)
         ihx.set_attr(pr1=0.98, pr2=0.98)
 
         bhe_pump.set_attr(eta_s=0.75, design=["eta_s"], offdesign=["eta_s_char"])
 
         compressor.set_attr(eta_s=0.85, design=["eta_s"], offdesign=["eta_s_char"])
 
-        c0.set_attr(fluid={self.working_fluid: 1, "water": 0})
-        c1.set_attr(x=0, p=CP.PropsSI(
-            "P", "T", self.param["T_sink"] + 273.15,
-            "Q", 0, self.working_fluid
-            ) / 1e5
-        )
-        c4.set_attr(x=1, p=CP.PropsSI(
-            "P", "T", self.param["T_bhe"] + 273.15,
-            "Q", 1, self.working_fluid
-            ) / 1e5
-        )
+        c0.set_attr(fluid={self.working_fluid: 1})
+        c1.set_attr(x=0, T=self.param["T_sink"])
+        c4.set_attr(x=1, T=self.param["T_bhe"])
+        c5.set_attr(Td_bp=5)
 
         c11.set_attr(
             T=self.param["T_bhe"] + 2,
             p=self.param["p_bhe"],
-            fluid={self.working_fluid: 0, "water": 1}
+            fluid={"water": 1}
         )
         c13.set_attr(
             T=self.param["T_bhe"] - 2,
@@ -96,10 +88,12 @@ class HeatPumpIHXModel:
 
         condenser.set_attr(Q=self.param["Q_design"])
 
-        self.nw.set_attr(iterinfo=False)
+        # self.nw.set_attr(iterinfo=False)
         self.nw.solve("design")
 
-        c4.set_attr(p=None)
+        c5.set_attr(Td_bp=None)
+        c4.set_attr(T=None)
+        ihx.set_attr(ttd_u=5)
         evaporator.set_attr(ttd_l=5)
 
         self.nw.set_attr(iterinfo=False)
@@ -197,14 +191,14 @@ import matplotlib.pyplot as plt
 fig, ax = plt.subplots(1, 2)
 
 ## outside of iteration#
-for wf in ["R1234ze(E)", "R134a", "R410A", "R600", "R290"]:
+for wf in ["R410A"]:
 
     data = {
         "working_fluid": wf,
         "T_bhe": 35,
         "p_bhe": 1.5,
-        "T_sink": 65,
-        "Q_design": -1e6,
+        "T_sink": 120,
+        "Q_design": -7.5e5,
     }
     a = HeatPumpIHXModel(data)
 
@@ -219,9 +213,9 @@ for wf in ["R1234ze(E)", "R134a", "R410A", "R600", "R290"]:
 
     ####
     a.nw.get_conn("13").set_attr(T=None)
-    a.nw.get_conn("11").set_attr(T=21.06, v=0.01295)
+    a.nw.get_conn("11").set_attr(T=35, v=0.01295)
     # a.nw.get_conn("11").set_attr(v=0.01)
-    a.nw.get_comp("Condenser").set_attr(Q=-10e5)
+    a.nw.get_comp("Condenser").set_attr(Q=-7.5e5)
     a.solve_offdesign()
 
     T_bhe_previous = a.get_param("Connections", "11", "T")
@@ -229,8 +223,8 @@ for wf in ["R1234ze(E)", "R134a", "R410A", "R600", "R290"]:
 
     import numpy as np
 
-    T_list = [45, 15, 30, 25, 35, 40, 15, 35, 25]
-    Q_list = np.array([2.5, 4, 7.5, 8, 4, 10, 9.2, 10.5, 3]) * -1e5
+    T_list = np.geomspace(30, 40, 10)[::-1]
+    Q_list = np.array([6.8] * 10) * -1e5
 
     COP_List = []
     carnot_COP = []
