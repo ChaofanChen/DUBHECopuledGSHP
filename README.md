@@ -6,9 +6,12 @@ data preparation and evaluation of the results for the paper
 U-type borehole heat exchanger in heating systems" submitted to Applied Energy.
 
 For the paper open source software for thermodynamic plant modeling
-((Thermal Engineering Systems in Python)[https://tespy.readthedocs.io]) and for
-thermo-hydro-mechanical-chemical modeling of the subsurface
-((OpenGeoSystems)[https://www.opengeosys.org/]) have been coupled.
+([Thermal Engineering Systems in Python](https://tespy.readthedocs.io): TESPy)
+and for thermo-hydro-mechanical-chemical modeling of the subsurface
+([OpenGeoSystems](https://www.opengeosys.org/): OGS) have been coupled.
+
+- DUBHE: Deep U-Type Borehole Heat Exchanger
+- GSHP: Ground Source Heat Pump
 
 ## Installation and usage
 
@@ -32,6 +35,26 @@ series.
 ![Coupling scheme](./coupling_scheme.svg)
 
 *Coupling scheme for OGS and TESPy*
+
+## Literature
+
+For the heat pump model TESPy has been used:
+
+- Francesco Witte, Ilja Tuschy (2020). TESPy: Thermal Engineering Systems in
+  Python. Journal of Open Source Software, 5(49), 2178,
+  [10.21105/joss.02178](https://doi.org/10.21105/joss.02178)
+
+For the subsurface model OGS has been used:
+
+-
+
+For the case study on integration of the DUBHE coupled GSHP demand data have
+been used based on the following publication:
+
+- Merlin Sebastian Triebs, Elisa Papadis, Hannes Cramer, George Tsatsaronis
+  (2021). Landscape of district heating systems in Germany – Status quo and
+  categorization. Energy Conversion and Management: X, 9, 100068, doi:
+  [10.1016/j.ecmx.2020.100068](https://doi.org/10.1016/j.ecmx.2020.100068).
 
 ## License
 
