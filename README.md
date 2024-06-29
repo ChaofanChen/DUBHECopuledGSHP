@@ -29,7 +29,7 @@ temperature. Once convergence on the BHE outflow temperature has been reached,
 the iteration process is started for the next time step in the heat demand time
 series.
 
-![Coupling scheme](./coupling.svg)
+![Coupling scheme](./coupling_scheme.svg)
 *Coupling scheme for OGS and TESPy*
 
 ## License
