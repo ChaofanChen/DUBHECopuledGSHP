@@ -30,6 +30,7 @@ the iteration process is started for the next time step in the heat demand time
 series.
 
 ![Coupling scheme](./coupling_scheme.svg)
+
 *Coupling scheme for OGS and TESPy*
 
 ## License
