@@ -46,7 +46,11 @@ For the heat pump model TESPy has been used:
 
 For the subsurface model OGS has been used:
 
--
+- Chaofan Chen, Wanlong Cai, Dmitri Naumov, Kun Tu, Hongwei Zhou,
+  Yuping Zhang, Olaf Kolditz, and Haibing Shao (2021). Numerical investigation
+  on the capacity and efficiency of a deep enhanced U-tube borehole heat
+  exchanger system for building heating. Renewable Energy 169: 557-572. doi:
+  [10.1016/j.renene.2021.01.033](https://doi.org/10.1016/j.renene.2021.01.033)
 
 For the case study on integration of the DUBHE coupled GSHP demand data have
 been used based on the following publication:
